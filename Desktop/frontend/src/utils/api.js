@@ -2,18 +2,26 @@
 import axios from "axios";
 
 /**
- * IMPORTANT:
- * Do NOT use localhost in production.
- * Use relative /api so Nginx can proxy to backend.
+ * BASE URL LOGIC
+ * - Local dev  → http://localhost:5000/api
+ * - Production → /api  (Nginx proxy)
+ */
+const BASE_URL =
+  window.location.hostname === "localhost"
+    ? "http://localhost:5000/api"
+    : "/api";
+
+/**
+ * AXIOS INSTANCE
  */
 const API = axios.create({
-  baseURL: "/api",
-  timeout: 10000, // 10 seconds
+  baseURL: BASE_URL,
+  timeout: 10000,
 });
 
 /**
  * REQUEST INTERCEPTOR
- * Attach JWT token if available
+ * Attach JWT token automatically
  */
 API.interceptors.request.use(
   (config) => {
@@ -25,39 +33,36 @@ API.interceptors.request.use(
 
     return config;
   },
-  (error) => {
-    return Promise.reject({
-      status: 0,
-      message: "Request initialization failed",
-    });
-  }
+  (error) => Promise.reject(error)
 );
 
 /**
  * RESPONSE INTERCEPTOR
- * Centralized error handling (LOGIN SAFE)
+ * Centralized error handling
  */
 API.interceptors.response.use(
   (response) => response,
 
   (error) => {
-    // 🔴 Server unreachable (EC2 down / port blocked)
+    // 🔴 Backend unreachable
     if (!error.response) {
       return Promise.reject({
         status: 0,
-        message:
-          "Unable to connect to server. Please try again later.",
+        message: "Server unreachable. Please try again later.",
       });
     }
 
     const { status, data } = error.response;
 
-    // 🔴 Unauthorized (wrong login / expired token)
+    // 🔴 Unauthorized (token expired / invalid)
     if (status === 401) {
       localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("userId");
+
       return Promise.reject({
         status,
-        message: data?.message || "Invalid email or password",
+        message: data?.message || "Unauthorized. Please login again.",
       });
     }
 
@@ -65,15 +70,15 @@ API.interceptors.response.use(
     if (status === 403) {
       return Promise.reject({
         status,
-        message: "You are not authorized to perform this action",
+        message: "Access denied.",
       });
     }
 
-    // 🔴 Not found
+    // 🔴 Not Found
     if (status === 404) {
       return Promise.reject({
         status,
-        message: "API endpoint not found",
+        message: "API endpoint not found.",
       });
     }
 
@@ -81,14 +86,14 @@ API.interceptors.response.use(
     if (status >= 500) {
       return Promise.reject({
         status,
-        message: "Server error. Please try again later.",
+        message: "Internal server error.",
       });
     }
 
-    // 🔴 Default error
+    // 🔴 Default
     return Promise.reject({
       status,
-      message: data?.message || "Something went wrong",
+      message: data?.message || "Something went wrong.",
     });
   }
 );
