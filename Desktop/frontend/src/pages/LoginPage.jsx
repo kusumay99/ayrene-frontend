@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../utils/api"; // ✅ USE AXIOS INSTANCE
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,39 +19,30 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          role,
-        }),
+      const res = await API.post("/auth/login", {
+        email: email.trim(),
+        password,
+        role,
       });
 
-      const data = await res.json();
-      setLoading(false);
-
-      if (!res.ok) {
-        setError(data.error || "Login failed");
-        return;
-      }
+      const data = res.data;
 
       // ✅ Store auth info
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.role || role);
       localStorage.setItem("userId", data.userId);
 
-      // ✅ Redirect by role
+      // ✅ Redirect based on role
       if ((data.role || role) === "admin") {
         navigate("/admin");
       } else {
         navigate("/user");
       }
-
     } catch (err) {
+      // ✅ Centralized Axios error handling
+      setError(err?.message || "Login failed. Please try again.");
+    } finally {
       setLoading(false);
-      setError("Server error: " + err.message);
     }
   };
 
@@ -69,7 +61,7 @@ export default function LoginPage() {
           required
         />
 
-        {/* PASSWORD WITH TOGGLE */}
+        {/* PASSWORD */}
         <div style={styles.passwordWrapper}>
           <input
             type={showPassword ? "text" : "password"}
