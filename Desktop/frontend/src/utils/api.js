@@ -15,7 +15,7 @@ const BASE_URL =
  */
 const API = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000, // increased for slow networks
+  timeout: 15000, // 15s
   headers: {
     "Content-Type": "application/json",
   },
@@ -28,11 +28,7 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error)
@@ -40,18 +36,14 @@ API.interceptors.request.use(
 
 /**
  * RESPONSE INTERCEPTOR
- * Centralized & SAFE error handling
+ * Centralized error handling
  */
 API.interceptors.response.use(
   (response) => response,
-
   (error) => {
-    /**
-     * ❌ Backend unreachable (server down, wrong URL, blocked port)
-     */
+    // Backend unreachable
     if (!error.response) {
       console.error("API unreachable:", error.message);
-
       return Promise.reject({
         status: 0,
         message:
@@ -61,23 +53,18 @@ API.interceptors.response.use(
 
     const { status, data } = error.response;
 
-    /**
-     * ❌ Unauthorized (JWT expired / invalid)
-     */
+    // Session expired / invalid token
     if (status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       localStorage.removeItem("userId");
-
       return Promise.reject({
         status,
         message: data?.message || "Session expired. Please login again.",
       });
     }
 
-    /**
-     * ❌ Forbidden
-     */
+    // Forbidden
     if (status === 403) {
       return Promise.reject({
         status,
@@ -85,9 +72,7 @@ API.interceptors.response.use(
       });
     }
 
-    /**
-     * ❌ Not Found
-     */
+    // Not found
     if (status === 404) {
       return Promise.reject({
         status,
@@ -95,21 +80,16 @@ API.interceptors.response.use(
       });
     }
 
-    /**
-     * ❌ Server Errors
-     */
+    // Server errors
     if (status >= 500) {
       return Promise.reject({
         status,
         message:
-          data?.message ||
-          "Server error occurred. Please try again later.",
+          data?.message || "Server error occurred. Please try again later.",
       });
     }
 
-    /**
-     * ❌ Validation / Other Errors
-     */
+    // Validation / other errors
     return Promise.reject({
       status,
       message: data?.message || "Something went wrong. Please try again.",
